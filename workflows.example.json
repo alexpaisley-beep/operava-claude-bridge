@@ -1,0 +1,20 @@
+[
+  {
+    "name": "fable",
+    "description": "Run the Fable review suite against a branch or PR checkout and return structured findings (severity, file, line, rationale, recommendation).",
+    "repositories": ["growth-engine", "operon"],
+    "command": ["npx", "--yes", "fable", "review", "--dir", "{{repoDir}}", "--format", "json"],
+    "parameters": [
+      {
+        "name": "scope",
+        "description": "Optional review scope filter passed to Fable via WORKFLOW_PARAM_SCOPE.",
+        "required": false,
+        "pattern": "^[a-z0-9/_-]{1,64}$"
+      }
+    ],
+    "env": {},
+    "timeoutMs": 900000,
+    "outputParser": "json",
+    "requiresRef": true
+  }
+]

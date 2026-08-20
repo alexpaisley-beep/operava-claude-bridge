@@ -1,0 +1,22 @@
+[
+  {
+    "key": "growth-engine",
+    "githubOwner": "your-org",
+    "githubRepo": "growth-engine",
+    "defaultBranch": "main",
+    "allowMerge": false,
+    "concurrencyLimit": 1,
+    "workflows": ["echo-check", "fable"],
+    "instructions": "Node/TypeScript monorepo. Verify changes with `npm run typecheck && npm test` in the affected package. Never touch generated files under src/generated."
+  },
+  {
+    "key": "claude-bridge",
+    "githubOwner": "alexpaisley-beep",
+    "githubRepo": "operava-claude-bridge",
+    "defaultBranch": "main",
+    "allowMerge": false,
+    "concurrencyLimit": 1,
+    "workflows": ["echo-check"],
+    "instructions": "The Operava Claude Bridge codebase itself (TypeScript, Node 22, ESM). Run `npm run typecheck && npm run lint && npm test` to verify changes."
+  }
+]
