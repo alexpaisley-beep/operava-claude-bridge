@@ -20,4 +20,11 @@ export function createGitHubClient(config: BridgeConfig): GitHubClient {
   return createOctokitClient({ token: config.githubToken, baseUrl: config.githubApiBase });
 }
 
-export type { GitHubClient, PrInfo, ChecksSummary, MergeResult } from './types.js';
+export type {
+  AccessibleRepositoriesResult,
+  AccessibleRepository,
+  ChecksSummary,
+  GitHubClient,
+  MergeResult,
+  PrInfo,
+} from './types.js';

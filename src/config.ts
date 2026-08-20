@@ -75,6 +75,11 @@ const envSchema = z.object({
   GIT_REMOTE_URL_BASE: z.string().optional().transform((v) => v ?? 'https://github.com'),
   /** 'octokit' for real GitHub, 'mock' only for tests/local dry runs. */
   GITHUB_CLIENT: z.enum(['octokit', 'mock']).optional().transform((v) => v ?? 'octokit'),
+  /**
+   * Register every repository GITHUB_TOKEN can reach into the registry at boot
+   * (additive only — existing entries, including disabled ones, are untouched).
+   */
+  GITHUB_AUTO_REGISTER_REPOS: boolFromEnv(true),
 
   ANTHROPIC_API_KEY: z.string().optional(),
   /** 'agent-sdk' for real Claude Code execution, 'mock' only for tests. */
@@ -201,6 +206,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     githubToken: e.GITHUB_TOKEN,
     githubApiBase: e.GITHUB_API_BASE,
     githubClient: e.GITHUB_CLIENT,
+    githubAutoRegisterRepos: e.GITHUB_AUTO_REGISTER_REPOS,
     gitRemoteUrlBase: e.GIT_REMOTE_URL_BASE.replace(/\/+$/, ''),
 
     anthropicApiKey: e.ANTHROPIC_API_KEY,

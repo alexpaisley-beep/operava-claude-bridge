@@ -1,13 +1,33 @@
 import { Octokit } from '@octokit/rest';
 import { RequestError } from '@octokit/request-error';
 import { BridgeError } from '../errors.js';
-import type { ChecksSummary, GitHubClient, MergeResult, PrInfo } from './types.js';
+import type {
+  AccessibleRepositoriesResult,
+  AccessibleRepository,
+  ChecksSummary,
+  GitHubClient,
+  MergeResult,
+  PrInfo,
+} from './types.js';
 
-export function createOctokitClient(opts: { token: string; baseUrl?: string }): GitHubClient {
+/**
+ * Hard ceiling on repository-discovery pagination (100 repos per page, so
+ * 10,000 repositories). Hitting it is reported as `truncated` rather than
+ * silently dropping the tail.
+ */
+export const MAX_DISCOVERY_PAGES = 100;
+
+export function createOctokitClient(opts: {
+  token: string;
+  baseUrl?: string;
+  /** Test seam: inject a stub fetch instead of the global one. */
+  fetch?: typeof globalThis.fetch;
+}): GitHubClient {
   const octokit = new Octokit({
     auth: opts.token,
     baseUrl: opts.baseUrl,
     userAgent: 'operava-claude-bridge/1.0.0',
+    ...(opts.fetch ? { request: { fetch: opts.fetch } } : {}),
   });
   return new OctokitGitHubClient(octokit);
 }
@@ -61,8 +81,77 @@ function mapError(err: unknown, context: string): BridgeError {
   });
 }
 
+type OctokitRepo = {
+  name: string;
+  owner: { login: string } | null;
+  default_branch?: string;
+};
+
+function mapAccessibleRepo(r: OctokitRepo): AccessibleRepository | null {
+  const owner = r.owner?.login;
+  if (!owner || !r.name) return null;
+  return { owner, repo: r.name, defaultBranch: r.default_branch || 'main' };
+}
+
+/**
+ * Drain a paginated repository listing, stopping at MAX_DISCOVERY_PAGES and
+ * reporting whether GitHub still had more pages to give.
+ */
+async function collectRepos(
+  pages: AsyncIterable<{ data: unknown; headers: { link?: string } }>,
+): Promise<AccessibleRepositoriesResult> {
+  const repositories: AccessibleRepository[] = [];
+  let seenPages = 0;
+  let truncated = false;
+  for await (const response of pages) {
+    // The paginate plugin normalizes {total_count, repositories} payloads into
+    // an array; tolerate both shapes anyway.
+    const items: OctokitRepo[] = Array.isArray(response.data)
+      ? (response.data as OctokitRepo[])
+      : ((response.data as { repositories?: OctokitRepo[] }).repositories ?? []);
+    for (const item of items) {
+      const mapped = mapAccessibleRepo(item);
+      if (mapped) repositories.push(mapped);
+    }
+    seenPages += 1;
+    if (seenPages >= MAX_DISCOVERY_PAGES) {
+      truncated = (response.headers.link ?? '').includes('rel="next"');
+      break;
+    }
+  }
+  return { repositories, truncated };
+}
+
 class OctokitGitHubClient implements GitHubClient {
   constructor(private readonly octokit: Octokit) {}
+
+  async listAccessibleRepositories(): Promise<AccessibleRepositoriesResult> {
+    const context = 'listing repositories accessible to the bridge credentials';
+    try {
+      return await collectRepos(
+        this.octokit.paginate.iterator(this.octokit.repos.listForAuthenticatedUser, {
+          per_page: 100,
+          affiliation: 'owner,collaborator,organization_member',
+          sort: 'full_name',
+        }),
+      );
+    } catch (err) {
+      // GitHub App installation tokens cannot call /user/repos ("Resource not
+      // accessible by integration"); they enumerate via /installation/repositories.
+      if (err instanceof RequestError && err.status === 403) {
+        try {
+          return await collectRepos(
+            this.octokit.paginate.iterator(this.octokit.apps.listReposAccessibleToInstallation, {
+              per_page: 100,
+            }),
+          );
+        } catch (fallbackErr) {
+          throw mapError(fallbackErr, context);
+        }
+      }
+      throw mapError(err, context);
+    }
+  }
 
   async getPullRequest(owner: string, repo: string, number: number): Promise<PrInfo | null> {
     try {
