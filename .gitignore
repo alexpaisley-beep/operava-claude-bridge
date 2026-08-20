@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment / secrets — never commit credentials
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage/
+.test-postgres/
+
+# Runtime data (local dev)
+data/
+
+# Logs
+*.log
+
+# OS noise
+.DS_Store
