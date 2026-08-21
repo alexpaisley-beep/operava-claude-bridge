@@ -13,7 +13,7 @@ import { createLogger, type Logger } from '../logger.js';
 import { AgentSdkClaudeRunner } from '../claude/agent-sdk-runner.js';
 import { MockClaudeRunner } from '../claude/mock-runner.js';
 import type { ClaudeRunner } from '../claude/types.js';
-import { syncRepositoriesFromFile } from '../registry/repositories-file.js';
+import { bootstrapRepositoryRegistry } from '../registry/bootstrap.js';
 import { loadWorkflowRegistry } from '../workflows/registry.js';
 import { cleanupWorkspaces } from './cleanup.js';
 import { reconcile } from './reconcile.js';
@@ -46,14 +46,12 @@ async function main(): Promise<void> {
   const logger = createLogger({ level: config.logLevel, service: 'claude-bridge-worker' });
   const db: Db = createPool(config);
   await runMigrations(db, { logger });
-  if (config.repositoriesFile) {
-    await syncRepositoriesFromFile(db, config.repositoriesFile, logger);
-  }
+  const github = createGitHubClient(config);
+  await bootstrapRepositoryRegistry({ db, config, github, logger });
   await fs.mkdir(config.workspaceRoot, { recursive: true });
   await fs.mkdir(config.claudeHomeDir, { recursive: true });
 
   const workflows = await loadWorkflowRegistry(config.workflowsFile);
-  const github = createGitHubClient(config);
   const claude = createClaudeRunner(config, logger);
   const workspaces = new WorkspaceManager({
     workspaceRoot: config.workspaceRoot,

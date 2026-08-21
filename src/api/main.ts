@@ -8,7 +8,7 @@ import { heartbeatWorker } from '../db/workers.js';
 import { createGitHubClient } from '../github/index.js';
 import { createLogger } from '../logger.js';
 import { createHttpApp } from '../mcp/http.js';
-import { syncRepositoriesFromFile } from '../registry/repositories-file.js';
+import { bootstrapRepositoryRegistry } from '../registry/bootstrap.js';
 import { loadWorkflowRegistry } from '../workflows/registry.js';
 
 /**
@@ -22,11 +22,9 @@ async function main(): Promise<void> {
   const db = createPool(config);
 
   await runMigrations(db, { logger });
-  if (config.repositoriesFile) {
-    await syncRepositoriesFromFile(db, config.repositoriesFile, logger);
-  }
-  const workflows = await loadWorkflowRegistry(config.workflowsFile);
   const github = createGitHubClient(config);
+  await bootstrapRepositoryRegistry({ db, config, github, logger });
+  const workflows = await loadWorkflowRegistry(config.workflowsFile);
   const authProvider = new BridgeAuthProvider({ db, config, logger });
 
   const app = createHttpApp({ db, config, logger, github, workflows, authProvider });

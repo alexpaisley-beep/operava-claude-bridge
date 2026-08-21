@@ -106,6 +106,36 @@ drop-in implementation swap. Trade-off documented in the README. Merge uses
 the GitHub merge API's `sha` parameter — expected-head protection enforced by
 GitHub itself, not just by the bridge's pre-checks.
 
+## Repository registry: discovered from GitHub, additive only
+
+A fresh production deployment used to start with an empty allowlist — every
+MCP call failed with `REPOSITORY_NOT_FOUND` until an operator ran the `repos`
+CLI or wired up `REPOSITORIES_FILE`. Both entrypoints now bootstrap the
+registry at boot: `REPOSITORIES_FILE` first, then every repository the
+`GITHUB_TOKEN` can reach (`GET /user/repos`, falling back to
+`GET /installation/repositories` on the 403 a GitHub App token gets there).
+
+The allowlist architecture is unchanged — discovery only writes rows through
+the same `upsertRepository` chokepoint, and permission ceilings remain a
+server-side decision (engineering permissions on, `allowMerge` off,
+`concurrencyLimit` 1). Three properties make it safe to run on every boot:
+
+- **Additive.** Existing entries are matched by `owner/repo`, not by key, and
+  are left untouched — hand-tuned settings win and a disabled repository is
+  never re-enabled by discovery.
+- **Stable keys.** `owner/repo` lowercased with disallowed characters folded to
+  `-`; over-long keys, and the rare pair that folds onto a key another
+  repository already holds, get a suffix hashed from the full `owner/repo`, so
+  a key never moves between runs.
+- **Fail-safe.** A broken `REPOSITORIES_FILE` still fails startup loudly, but
+  GitHub being unreachable only logs — the service starts on the registry it
+  already has. Nothing is ever deleted or disabled. Pagination is capped
+  (100 pages) and a truncated enumeration is reported, not hidden.
+
+Alternative considered: discovering repositories lazily on `list_repositories`.
+Rejected — it puts an unbounded GitHub call on a read path, and the registry
+row is also what the worker and permission checks read.
+
 ## Workflows: server-side allowlist, argv templates, no shell
 
 Definitions live in code (built-ins) plus an operator-provided JSON file.

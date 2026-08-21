@@ -3,9 +3,12 @@
 ## What has been verified (no external credentials required)
 
 - `npm run lint`, `npm run typecheck`, `npm run build`: green.
-- `npm test`: 88 tests across 7 files — unit + integration against a real
+- `npm test`: 108 tests across 9 files — unit + integration against a real
   Postgres cluster and real git repositories (Claude and GitHub mocked at
-  their interfaces).
+  their interfaces). Includes registry bootstrap: GitHub repository discovery
+  (pagination, installation-token fallback, duplicate handling, key stability),
+  explicit-config precedence, disabled repositories staying disabled, and a
+  discovery outage leaving the registry intact.
 - `scripts/e2e-local.ts`: 22/22 checks with the **real compiled API and
   worker running as separate processes**, a real Postgres, real `file://` git
   remotes, and a real MCP SDK client over Streamable HTTP:
@@ -35,6 +38,11 @@ as `claude-bridge` in the registry, worker volume mounted at `/data`.
 3. **ChatGPT connector**: add `https://<api-domain>/mcp` as a custom connector
    with OAuth; approve on the consent page with `BRIDGE_OPERATOR_KEY`; confirm
    ChatGPT lists the 14 tools.
+3b. **Registry auto-registration**: `list_repositories` right after the first
+   deploy lists every repository the `GITHUB_TOKEN` can reach — keys derived
+   from `owner/repo`, `merge: false`, `concurrencyLimit: 1` — plus any
+   explicitly configured entries with their own settings. Redeploy and confirm
+   keys are unchanged and no disabled repository came back enabled.
 4. **Live engineering task** (harmless, this repo):
    `start_repo_task(repository="claude-bridge", objective="Create a harmless
    documentation branch: add a short ARCHITECTURE section to the README

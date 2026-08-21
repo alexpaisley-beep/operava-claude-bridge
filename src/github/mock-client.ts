@@ -1,5 +1,12 @@
 import { BridgeError } from '../errors.js';
-import type { ChecksSummary, GitHubClient, MergeResult, PrInfo } from './types.js';
+import type {
+  AccessibleRepositoriesResult,
+  AccessibleRepository,
+  ChecksSummary,
+  GitHubClient,
+  MergeResult,
+  PrInfo,
+} from './types.js';
 
 /**
  * In-memory GitHub client for tests and credential-less local development.
@@ -12,6 +19,9 @@ export class MockGitHubClient implements GitHubClient {
   checks = new Map<string, ChecksSummary>();
   unresolvedThreads = new Map<string, number | null>();
   comments: { key: string; body: string }[] = [];
+  /** Repositories "reachable" by the mock credentials (registry discovery). */
+  accessibleRepos: AccessibleRepository[] = [];
+  accessibleReposTruncated = false;
   private nextPrNumber = 100;
 
   private key(owner: string, repo: string, number: number): string {
@@ -28,6 +38,10 @@ export class MockGitHubClient implements GitHubClient {
 
   setChecks(owner: string, repo: string, sha: string, summary: ChecksSummary): void {
     this.checks.set(`${owner}/${repo}@${sha}`, summary);
+  }
+
+  async listAccessibleRepositories(): Promise<AccessibleRepositoriesResult> {
+    return { repositories: [...this.accessibleRepos], truncated: this.accessibleReposTruncated };
   }
 
   async getPullRequest(owner: string, repo: string, number: number): Promise<PrInfo | null> {

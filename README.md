@@ -107,6 +107,8 @@ npm run repos -- disable --key growth-engine
 
 Or declaratively: point `REPOSITORIES_FILE` at a JSON file (see `repositories.example.json`) — synced at boot.
 
+**Auto-registration from GitHub.** At boot (after `REPOSITORIES_FILE`), both services register every repository the `GITHUB_TOKEN` can reach, so a fresh deployment never comes up with an empty allowlist. Keys are derived from `owner/repo` (`operava/growth-engine` → `operava-growth-engine`; over-long or colliding names get a stable hash suffix). New entries get normal engineering permissions — code changes, commits, pushes, PR create/update — with **merge disabled** and `concurrencyLimit: 1`; ceilings stay a server-side decision and are never negotiable from MCP. Discovery is strictly additive: entries that already exist (from the file, the CLI, or an earlier run) are matched by `owner/repo` and left untouched, so hand-tuned settings win and a **disabled repository stays disabled**. If GitHub is unreachable at boot the services still start on the registry they already have. Set `GITHUB_AUTO_REGISTER_REPOS=false` to manage the allowlist by hand.
+
 ## Workflows (and Fable)
 
 Workflow definitions are server-controlled: built-ins plus `WORKFLOWS_FILE` (see `workflows.example.json`). A workflow runs for a repository only when **both** the definition allowlists the repo and the repo's registry entry lists the workflow. Commands are argv arrays spawned without a shell; `{{repoDir}}`, `{{branch}}`, and validated `{{param:NAME}}` placeholders are substituted; parameters are also injected as `WORKFLOW_PARAM_*` env vars alongside `WORKFLOW_BRANCH`, `WORKFLOW_HEAD_SHA`, `WORKFLOW_PR_NUMBER`, `WORKFLOW_REPO_DIR`.
@@ -154,8 +156,9 @@ src/claude/           Agent SDK runner, mock runner, prompt builders
 src/gitx/             safe git exec, validation, workspace manager
 src/github/           GitHub client interface + Octokit/mock implementations
 src/workflows/        allowlisted workflow registry
+src/registry/         repository registry bootstrap (file sync + GitHub discovery)
 src/db/               data access + migration runner
-tests/                88 tests: unit + integration (real Postgres, real git, mock Claude/GitHub)
+tests/                108 tests: unit + integration (real Postgres, real git, mock Claude/GitHub)
 scripts/e2e-local.ts  multi-process end-to-end verification (see docs/VERIFICATION.md)
 docs/DECISIONS.md     research findings and technical decisions
 ```

@@ -39,7 +39,26 @@ export interface MergeResult {
   message: string;
 }
 
+/** A repository the configured GITHUB_TOKEN can reach. */
+export interface AccessibleRepository {
+  owner: string;
+  repo: string;
+  defaultBranch: string;
+}
+
+export interface AccessibleRepositoriesResult {
+  repositories: AccessibleRepository[];
+  /** True when the page cap stopped enumeration before GitHub ran out of pages. */
+  truncated: boolean;
+}
+
 export interface GitHubClient {
+  /**
+   * Every repository the bridge's credentials can reach, across all pages.
+   * Used at boot to populate the repository registry so production never
+   * starts with an empty allowlist.
+   */
+  listAccessibleRepositories(): Promise<AccessibleRepositoriesResult>;
   getPullRequest(owner: string, repo: string, number: number): Promise<PrInfo | null>;
   findOpenPrByHead(owner: string, repo: string, headBranch: string): Promise<PrInfo | null>;
   createPullRequest(
